@@ -1,0 +1,1190 @@
+#include <iostream>
+#include <string>
+#include <fstream>
+#include <sstream>
+#include <stdexcept>
+#include <iomanip>
+#include <algorithm>
+#include <limits>
+#include <cctype>
+#include <cmath>
+
+using namespace std;
+
+// ======================================================
+// EMPLOYEE DATABASE MANAGEMENT SYSTEM
+// ======================================================
+
+const int CAPACITY = 100;
+const string FILE_NAME = "employees_v2.txt";
+
+// ======================================================
+// EMPLOYEE CLASS
+// ======================================================
+
+class Employee
+{
+public:
+    int id = 0;
+    string name;
+    int age = 0;
+    string dept;
+    string gender;
+    string designation = "Intern";
+    double salary = 0.0;
+    bool active = true;
+    double performance = 0.0;
+};
+
+// ======================================================
+// SAFE INTEGER INPUT
+// ======================================================
+
+int getInteger(const string& message)
+{
+    while (true)
+    {
+        string input;
+
+        cout << message;
+
+        if (!getline(cin, input))
+        {
+            throw runtime_error("Input stream closed.");
+        }
+
+        stringstream ss(input);
+        int value;
+        char extra;
+
+        if ((ss >> value) && !(ss >> extra))
+        {
+            return value;
+        }
+
+        cout << "Error: Enter a valid whole number.\n";
+    }
+}
+
+// ======================================================
+// SAFE DECIMAL INPUT
+// ======================================================
+
+double getDouble(const string& message)
+{
+    while (true)
+    {
+        string input;
+
+        cout << message;
+
+        if (!getline(cin, input))
+        {
+            throw runtime_error("Input stream closed.");
+        }
+
+        stringstream ss(input);
+        double value;
+        char extra;
+
+        if ((ss >> value) &&
+            !(ss >> extra) &&
+            isfinite(value))
+        {
+            return value;
+        }
+
+        cout << "Error: Enter a valid numeric value.\n";
+    }
+}
+
+// ======================================================
+// SAFE TEXT INPUT
+// ======================================================
+
+string getText(const string& message)
+{
+    while (true)
+    {
+        string value;
+
+        cout << message;
+
+        if (!getline(cin, value))
+        {
+            throw runtime_error("Input stream closed.");
+        }
+
+        if (value.find_first_not_of(" \t\r\n") != string::npos)
+        {
+            return value;
+        }
+
+        cout << "Error: This field cannot be empty.\n";
+    }
+}
+
+// ======================================================
+// VALIDATE EMPLOYEE NAME
+// Allows letters, spaces, hyphens and apostrophes.
+// ======================================================
+
+string getValidName(const string& message)
+{
+    while (true)
+    {
+        string name = getText(message);
+
+        bool valid = true;
+        bool hasLetter = false;
+
+        for (unsigned char ch : name)
+        {
+            if (isalpha(ch))
+            {
+                hasLetter = true;
+            }
+            else if (ch != ' ' && ch != '-' && ch != '\'')
+            {
+                valid = false;
+                break;
+            }
+        }
+
+        if (valid && hasLetter)
+        {
+            return name;
+        }
+
+        cout << "Error: Name must contain letters only.\n";
+        cout << "Example: Vikrant Dhami\n";
+    }
+}
+
+// ======================================================
+// GENDER SELECTION
+// ======================================================
+
+string getGender()
+{
+    while (true)
+    {
+        cout << "\nSelect Gender:\n";
+        cout << "1. Male\n";
+        cout << "2. Female\n";
+
+        int choice = getInteger("Enter choice (1-2): ");
+
+        if (choice == 1)
+        {
+            return "Male";
+        }
+
+        if (choice == 2)
+        {
+            return "Female";
+        }
+
+        cout << "Error: Select either 1 or 2.\n";
+    }
+}
+
+// ======================================================
+// YES / NO CONFIRMATION
+// ======================================================
+
+bool confirmAction(const string& message)
+{
+    while (true)
+    {
+        string answer = getText(message + " (Yes/No): ");
+
+        transform(
+            answer.begin(),
+            answer.end(),
+            answer.begin(),
+            [](unsigned char ch)
+            {
+                return static_cast<char>(tolower(ch));
+            }
+        );
+
+        if (answer == "yes" || answer == "y")
+        {
+            return true;
+        }
+
+        if (answer == "no" || answer == "n")
+        {
+            return false;
+        }
+
+        cout << "Error: Enter Yes or No.\n";
+    }
+}
+
+// ======================================================
+// VALIDATE DESIGNATION
+// Allows titles such as C++ Developer and QA Engineer.
+// ======================================================
+
+string getDesignation(const string& message)
+{
+    while (true)
+    {
+        string designation = getText(message);
+
+        bool hasLetter = false;
+        bool valid = true;
+
+        for (unsigned char ch : designation)
+        {
+            if (isalpha(ch))
+            {
+                hasLetter = true;
+            }
+            else if (isdigit(ch))
+            {
+                continue;
+            }
+            else if (ch == ' ' || ch == '-' ||
+                     ch == '&' || ch == '+' ||
+                     ch == '.' || ch == '#')
+            {
+                continue;
+            }
+            else
+            {
+                valid = false;
+                break;
+            }
+        }
+
+        if (valid && hasLetter)
+        {
+            return designation;
+        }
+
+        cout << "Error: Enter a valid job designation.\n";
+        cout << "Examples: Software Developer, C++ Developer, "
+             << "Data Analyst\n";
+    }
+}
+
+// ======================================================
+// FIND EMPLOYEE BY ID
+// ======================================================
+
+int findEmployee(Employee employees[], int count, int id)
+{
+    for (int i = 0; i < count; i++)
+    {
+        if (employees[i].id == id)
+        {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
+// ======================================================
+// DISPLAY ONE EMPLOYEE
+// ======================================================
+
+void displayEmployee(const Employee& employee)
+{
+    cout << "\n----------------------------------------\n";
+    cout << "Employee ID : " << employee.id << '\n';
+    cout << "Name        : " << employee.name << '\n';
+    cout << "Age         : " << employee.age << '\n';
+    cout << "Department  : " << employee.dept << '\n';
+    cout << "Gender      : " << employee.gender << '\n';
+    cout << "Designation : " << employee.designation << '\n';
+
+    cout << fixed << setprecision(2);
+    cout << "Salary      : " << employee.salary << '\n';
+
+    cout << "Status      : "
+         << (employee.active ? "Active" : "Inactive") << '\n';
+
+    cout << "Performance : "
+         << employee.performance << "/100\n";
+
+    cout << "----------------------------------------\n";
+}
+
+// ======================================================
+// SAVE EMPLOYEES TO FILE
+// ======================================================
+
+void saveEmployees(Employee employees[], int count)
+{
+    ofstream file(FILE_NAME);
+
+    if (!file.is_open())
+    {
+        throw runtime_error(
+            "Could not open employee file for saving."
+        );
+    }
+
+    file << setprecision(17);
+
+    for (int i = 0; i < count; i++)
+    {
+        file << employees[i].id << ' '
+             << employees[i].age << ' '
+             << quoted(employees[i].name) << ' '
+             << quoted(employees[i].dept) << ' '
+             << quoted(employees[i].gender) << ' '
+             << quoted(employees[i].designation) << ' '
+             << employees[i].salary << ' '
+             << employees[i].active << ' '
+             << employees[i].performance << '\n';
+    }
+
+    file.close();
+
+    if (file.fail())
+    {
+        throw runtime_error(
+            "An error occurred while saving employee records."
+        );
+    }
+}
+
+// ======================================================
+// LOAD EMPLOYEES FROM FILE
+// ======================================================
+
+void loadEmployees(Employee employees[], int& count)
+{
+    ifstream file(FILE_NAME);
+
+    // No file means this is probably the first run.
+    if (!file.is_open())
+    {
+        return;
+    }
+
+    Employee temp;
+    int loaded = 0;
+
+    while (file >> temp.id
+                >> temp.age
+                >> quoted(temp.name)
+                >> quoted(temp.dept)
+                >> quoted(temp.gender)
+                >> quoted(temp.designation)
+                >> temp.salary
+                >> temp.active
+                >> temp.performance)
+    {
+        if (loaded >= CAPACITY)
+        {
+            throw runtime_error(
+                "Employee file exceeds database capacity."
+            );
+        }
+
+        if (temp.id <= 0)
+        {
+            throw runtime_error("Invalid employee ID in file.");
+        }
+
+        if (temp.age < 1 || temp.age > 120)
+        {
+            throw runtime_error("Invalid employee age in file.");
+        }
+
+        if (temp.salary < 0 ||
+            temp.salary > 1e12 ||
+            !isfinite(temp.salary))
+        {
+            throw runtime_error("Invalid salary in file.");
+        }
+
+        if (temp.performance < 0 ||
+            temp.performance > 100 ||
+            !isfinite(temp.performance))
+        {
+            throw runtime_error("Invalid performance score in file.");
+        }
+
+        if (temp.active != true && temp.active != false)
+        {
+            throw runtime_error("Invalid employee status in file.");
+        }
+
+        if (temp.name.find_first_not_of(" \t\r\n") == string::npos ||
+            temp.dept.find_first_not_of(" \t\r\n") == string::npos ||
+            temp.gender.find_first_not_of(" \t\r\n") == string::npos ||
+            temp.designation.find_first_not_of(" \t\r\n") == string::npos)
+        {
+            throw runtime_error("Empty employee field found in file.");
+        }
+
+       
+        // Accept gender values regardless of capitalization.
+transform(
+    temp.gender.begin(),
+    temp.gender.end(),
+    temp.gender.begin(),
+    [](unsigned char ch)
+    {
+        return static_cast<char>(tolower(ch));
+    }
+);
+
+if (temp.gender == "male")
+{
+    temp.gender = "Male";
+}
+else if (temp.gender == "female")
+{
+    temp.gender = "Female";
+}
+else
+{
+    throw runtime_error("Invalid gender found in employee file.");
+}
+
+        if (findEmployee(employees, loaded, temp.id) != -1)
+        {
+            throw runtime_error("Duplicate employee ID found in file.");
+        }
+
+        employees[loaded] = temp;
+        loaded++;
+    }
+
+    if (!file.eof())
+    {
+        throw runtime_error(
+            "Employee file contains invalid or incomplete records."
+        );
+    }
+
+    count = loaded;
+}
+
+// ======================================================
+// ADD EMPLOYEE
+// ======================================================
+
+void addEmployee(Employee employees[], int& count)
+{
+    if (count >= CAPACITY)
+    {
+        throw runtime_error("Employee database is full!");
+    }
+
+    cout << "\n========== ADD EMPLOYEE ==========\n";
+
+    Employee newEmployee;
+
+    // Employee ID.
+    while (true)
+    {
+        newEmployee.id = getInteger("Enter Employee ID: ");
+
+        if (newEmployee.id <= 0)
+        {
+            cout << "Error: ID must be greater than zero.\n";
+            continue;
+        }
+
+        if (findEmployee(employees, count, newEmployee.id) != -1)
+        {
+            cout << "Error: This Employee ID already exists.\n";
+            continue;
+        }
+
+        break;
+    }
+
+    // Employee name.
+    newEmployee.name = getValidName("Enter Employee Name: ");
+
+    // Employee age.
+    while (true)
+    {
+        newEmployee.age = getInteger("Enter Employee Age: ");
+
+        if (newEmployee.age >= 1 && newEmployee.age <= 120)
+        {
+            break;
+        }
+
+        cout << "Error: Age must be between 1 and 120.\n";
+    }
+
+    // Department.
+    newEmployee.dept = getText("Enter Department: ");
+
+    // Gender selection.
+    newEmployee.gender = getGender();
+
+    // Designation.
+    newEmployee.designation =
+        getDesignation("Enter Designation: ");
+
+    // Salary.
+    while (true)
+    {
+        newEmployee.salary = getDouble("Enter Salary: ");
+
+        if (newEmployee.salary >= 0 &&
+            newEmployee.salary <= 1e12)
+        {
+            break;
+        }
+
+        cout << "Error: Salary must be between 0 and "
+             << "1000000000000.\n";
+    }
+
+    // Performance score.
+    while (true)
+    {
+        newEmployee.performance =
+            getDouble("Enter Performance Score (0-100): ");
+
+        if (newEmployee.performance >= 0 &&
+            newEmployee.performance <= 100)
+        {
+            break;
+        }
+
+        cout << "Error: Performance must be between 0 and 100.\n";
+    }
+
+    newEmployee.active = true;
+
+    // Review details before adding.
+    cout << "\n========== REVIEW EMPLOYEE DETAILS ==========\n";
+    displayEmployee(newEmployee);
+
+    if (!confirmAction("Do you want to add this employee?"))
+    {
+        cout << "\nEmployee addition cancelled.\n";
+        return;
+    }
+
+    // Add the record.
+    employees[count] = newEmployee;
+    count++;
+
+    try
+    {
+        saveEmployees(employees, count);
+    }
+    catch (...)
+    {
+        count--;
+        throw;
+    }
+
+    cout << "\nEmployee added successfully!\n";
+    cout << "Employees stored: "
+         << count << "/" << CAPACITY << '\n';
+}
+
+// ======================================================
+// DISPLAY ALL EMPLOYEES
+// ======================================================
+
+void displayEmployees(Employee employees[], int count)
+{
+    if (count == 0)
+    {
+        cout << "\nNo employees found.\n";
+        return;
+    }
+
+    cout << "\n========== ALL EMPLOYEES ==========\n";
+
+    for (int i = 0; i < count; i++)
+    {
+        displayEmployee(employees[i]);
+    }
+
+    cout << "\nTotal employees: " << count << '\n';
+}
+
+// ======================================================
+// SEARCH EMPLOYEE
+// ======================================================
+
+void searchEmployee(Employee employees[], int count)
+{
+    int id = getInteger("\nEnter Employee ID to search: ");
+
+    int index = findEmployee(employees, count, id);
+
+    if (index == -1)
+    {
+        cout << "\nEmployee not found.\n";
+        return;
+    }
+
+    cout << "\nEmployee found!\n";
+    displayEmployee(employees[index]);
+}
+
+// ======================================================
+// UPDATE EMPLOYEE
+// ======================================================
+
+void updateEmployee(Employee employees[], int count)
+{
+    int id = getInteger("\nEnter Employee ID to update: ");
+
+    int index = findEmployee(employees, count, id);
+
+    if (index == -1)
+    {
+        cout << "\nEmployee not found.\n";
+        return;
+    }
+
+    cout << "\nCurrent employee details:\n";
+    displayEmployee(employees[index]);
+
+    Employee updated = employees[index];
+
+    updated.name = getValidName("Enter New Name: ");
+
+    while (true)
+    {
+        updated.age = getInteger("Enter New Age: ");
+
+        if (updated.age >= 1 && updated.age <= 120)
+        {
+            break;
+        }
+
+        cout << "Error: Age must be between 1 and 120.\n";
+    }
+
+    updated.dept = getText("Enter New Department: ");
+    updated.gender = getGender();
+
+    updated.designation =
+        getDesignation("Enter New Designation: ");
+
+    while (true)
+    {
+        updated.salary = getDouble("Enter New Salary: ");
+
+        if (updated.salary >= 0 &&
+            updated.salary <= 1e12)
+        {
+            break;
+        }
+
+        cout << "Error: Invalid salary.\n";
+    }
+
+    while (true)
+    {
+        updated.performance =
+            getDouble("Enter New Performance Score (0-100): ");
+
+        if (updated.performance >= 0 &&
+            updated.performance <= 100)
+        {
+            break;
+        }
+
+        cout << "Error: Performance must be between 0 and 100.\n";
+    }
+
+    if (!confirmAction("Save these employee changes?"))
+    {
+        cout << "\nUpdate cancelled.\n";
+        return;
+    }
+
+    Employee oldEmployee = employees[index];
+    employees[index] = updated;
+
+    try
+    {
+        saveEmployees(employees, count);
+    }
+    catch (...)
+    {
+        employees[index] = oldEmployee;
+        throw;
+    }
+
+    cout << "\nEmployee updated successfully!\n";
+}
+
+// ======================================================
+// DELETE EMPLOYEE
+// ======================================================
+
+void deleteEmployee(Employee employees[], int& count)
+{
+    if (count == 0)
+    {
+        cout << "\nNo employees available to delete.\n";
+        return;
+    }
+
+    int id = getInteger("\nEnter Employee ID to delete: ");
+
+    int index = findEmployee(employees, count, id);
+
+    if (index == -1)
+    {
+        cout << "\nEmployee not found.\n";
+        return;
+    }
+
+    cout << "\nEmployee selected for deletion:\n";
+    displayEmployee(employees[index]);
+
+    if (!confirmAction("Delete this employee permanently?"))
+    {
+        cout << "\nDeletion cancelled.\n";
+        return;
+    }
+
+    Employee backup[CAPACITY];
+
+    for (int i = 0; i < count; i++)
+    {
+        backup[i] = employees[i];
+    }
+
+    int oldCount = count;
+
+    for (int i = index; i < count - 1; i++)
+    {
+        employees[i] = employees[i + 1];
+    }
+
+    count--;
+
+    try
+    {
+        saveEmployees(employees, count);
+    }
+    catch (...)
+    {
+        count = oldCount;
+
+        for (int i = 0; i < count; i++)
+        {
+            employees[i] = backup[i];
+        }
+
+        throw;
+    }
+
+    cout << "\nEmployee deleted successfully!\n";
+}
+
+// ======================================================
+// PROMOTE EMPLOYEE
+// ======================================================
+
+void promoteEmployee(Employee employees[], int count)
+{
+    int id = getInteger("\nEnter Employee ID to promote: ");
+
+    int index = findEmployee(employees, count, id);
+
+    if (index == -1)
+    {
+        cout << "\nEmployee not found.\n";
+        return;
+    }
+
+    if (!employees[index].active)
+    {
+        cout << "\nCannot promote an inactive employee.\n";
+        return;
+    }
+
+    cout << "\nCurrent designation: "
+         << employees[index].designation << '\n';
+
+    cout << "Current salary: "
+         << employees[index].salary << '\n';
+
+    string newDesignation =
+        getDesignation("Enter New Designation: ");
+
+    double newSalary;
+
+    while (true)
+    {
+        newSalary = getDouble("Enter New Salary: ");
+
+        if (newSalary >= 0 && newSalary <= 1e12)
+        {
+            break;
+        }
+
+        cout << "Error: Invalid salary.\n";
+    }
+
+    if (!confirmAction("Confirm employee promotion?"))
+    {
+        cout << "\nPromotion cancelled.\n";
+        return;
+    }
+
+    Employee oldEmployee = employees[index];
+
+    employees[index].designation = newDesignation;
+    employees[index].salary = newSalary;
+
+    try
+    {
+        saveEmployees(employees, count);
+    }
+    catch (...)
+    {
+        employees[index] = oldEmployee;
+        throw;
+    }
+
+    cout << "\nEmployee promoted successfully!\n";
+}
+
+// ======================================================
+// CHANGE DEPARTMENT
+// ======================================================
+
+void changeDepartment(Employee employees[], int count)
+{
+    int id = getInteger("\nEnter Employee ID: ");
+
+    int index = findEmployee(employees, count, id);
+
+    if (index == -1)
+    {
+        cout << "\nEmployee not found.\n";
+        return;
+    }
+
+    cout << "Current department: "
+         << employees[index].dept << '\n';
+
+    string newDepartment = getText("Enter New Department: ");
+
+    if (!confirmAction("Confirm department change?"))
+    {
+        cout << "\nDepartment change cancelled.\n";
+        return;
+    }
+
+    string oldDepartment = employees[index].dept;
+    employees[index].dept = newDepartment;
+
+    try
+    {
+        saveEmployees(employees, count);
+    }
+    catch (...)
+    {
+        employees[index].dept = oldDepartment;
+        throw;
+    }
+
+    cout << "\nDepartment changed successfully!\n";
+}
+
+// ======================================================
+// DEACTIVATE EMPLOYEE
+// ======================================================
+
+void deactivateEmployee(Employee employees[], int count)
+{
+    int id = getInteger("\nEnter Employee ID to deactivate: ");
+
+    int index = findEmployee(employees, count, id);
+
+    if (index == -1)
+    {
+        cout << "\nEmployee not found.\n";
+        return;
+    }
+
+    if (!employees[index].active)
+    {
+        cout << "\nEmployee is already inactive.\n";
+        return;
+    }
+
+    cout << "\nEmployee selected:\n";
+    displayEmployee(employees[index]);
+
+    if (!confirmAction("Deactivate this employee?"))
+    {
+        cout << "\nDeactivation cancelled.\n";
+        return;
+    }
+
+    employees[index].active = false;
+
+    try
+    {
+        saveEmployees(employees, count);
+    }
+    catch (...)
+    {
+        employees[index].active = true;
+        throw;
+    }
+
+    cout << "\nEmployee deactivated successfully!\n";
+    cout << "The employee record has been retained.\n";
+}
+
+// ======================================================
+// SORT EMPLOYEES
+// ======================================================
+
+void sortEmployees(Employee employees[], int count)
+{
+    if (count < 2)
+    {
+        cout << "\nNot enough employees to sort.\n";
+        return;
+    }
+
+    cout << "\n========== SORT EMPLOYEES ==========\n";
+    cout << "1. Sort by ID (ascending)\n";
+    cout << "2. Sort by Name (alphabetical)\n";
+    cout << "3. Sort by Age (ascending)\n";
+    cout << "4. Sort by Salary (highest first)\n";
+
+    int choice = getInteger("\nChoose sorting method: ");
+
+    switch (choice)
+    {
+        case 1:
+            sort(employees, employees + count,
+                 [](const Employee& a, const Employee& b)
+                 {
+                     return a.id < b.id;
+                 });
+            break;
+
+        case 2:
+            sort(employees, employees + count,
+                 [](const Employee& a, const Employee& b)
+                 {
+                     return a.name < b.name;
+                 });
+            break;
+
+        case 3:
+            sort(employees, employees + count,
+                 [](const Employee& a, const Employee& b)
+                 {
+                     return a.age < b.age;
+                 });
+            break;
+
+        case 4:
+            sort(employees, employees + count,
+                 [](const Employee& a, const Employee& b)
+                 {
+                     return a.salary > b.salary;
+                 });
+            break;
+
+        default:
+            cout << "\nInvalid sorting option.\n";
+            return;
+    }
+
+    try
+    {
+        saveEmployees(employees, count);
+    }
+    catch (...)
+    {
+        // Sorting changed the array in memory.
+        // The old file remains the last known saved copy,
+        // although direct file writes cannot guarantee recovery.
+        throw;
+    }
+
+    cout << "\nEmployees sorted successfully!\n";
+    displayEmployees(employees, count);
+}
+
+// ======================================================
+// EMPLOYEE PERFORMANCE RANKING
+// ======================================================
+
+void performanceRanking(Employee employees[], int count)
+{
+    if (count == 0)
+    {
+        cout << "\nNo employees available for ranking.\n";
+        return;
+    }
+
+    Employee ranked[CAPACITY];
+
+    for (int i = 0; i < count; i++)
+    {
+        ranked[i] = employees[i];
+    }
+
+    sort(ranked, ranked + count,
+         [](const Employee& a, const Employee& b)
+         {
+             if (a.performance == b.performance)
+             {
+                 return a.id < b.id;
+             }
+
+             return a.performance > b.performance;
+         });
+
+    cout << "\n========== EMPLOYEE PERFORMANCE RANKING ==========\n";
+
+    cout << left
+         << setw(8) << "Rank"
+         << setw(12) << "ID"
+         << setw(25) << "Name"
+         << setw(20) << "Department"
+         << setw(15) << "Score"
+         << "Status\n";
+
+    cout << string(90, '-') << '\n';
+
+    for (int i = 0; i < count; i++)
+    {
+        cout << left
+             << setw(8) << i + 1
+             << setw(12) << ranked[i].id
+             << setw(25) << ranked[i].name
+             << setw(20) << ranked[i].dept
+             << setw(15) << ranked[i].performance
+             << (ranked[i].active ? "Active" : "Inactive")
+             << '\n';
+    }
+}
+
+// ======================================================
+// MAIN FUNCTION
+// ======================================================
+
+int main()
+{
+    Employee employees[CAPACITY];
+
+    int count = 0;
+
+    try
+    {
+        loadEmployees(employees, count);
+
+        cout << "\nEmployee database loaded successfully.\n";
+        cout << "Records loaded: " << count << '\n';
+    }
+    catch (const exception& e)
+    {
+        cerr << "\nCould not load employee data: "
+             << e.what() << '\n';
+
+        cerr << "The program will exit to protect "
+             << "the existing data.\n";
+
+        return 1;
+    }
+
+    while (true)
+    {
+        cout << "\n========================================\n";
+        cout << "       EMPLOYEE DATABASE SYSTEM\n";
+        cout << "========================================\n";
+
+        cout << "Employees stored: "
+             << count << "/" << CAPACITY << '\n';
+
+        cout << "\n1. Add Employee\n";
+        cout << "2. Display Employees\n";
+        cout << "3. Search Employee\n";
+        cout << "4. Update Employee\n";
+        cout << "5. Delete Employee\n";
+        cout << "6. Exit\n";
+        cout << "7. Promote Employee\n";
+        cout << "8. Change Department\n";
+        cout << "9. Deactivate Employee\n";
+        cout << "10. Sort Employees\n";
+        cout << "11. Employee Performance Ranking\n";
+
+        try
+        {
+            int choice = getInteger("\nEnter your choice: ");
+
+            switch (choice)
+            {
+                case 1:
+                    addEmployee(employees, count);
+                    break;
+
+                case 2:
+                    displayEmployees(employees, count);
+                    break;
+
+                case 3:
+                    searchEmployee(employees, count);
+                    break;
+
+                case 4:
+                    updateEmployee(employees, count);
+                    break;
+
+                case 5:
+                    deleteEmployee(employees, count);
+                    break;
+
+                case 6:
+                    cout << "\nExiting Employee Database. Goodbye!\n";
+                    return 0;
+
+                case 7:
+                    promoteEmployee(employees, count);
+                    break;
+
+                case 8:
+                    changeDepartment(employees, count);
+                    break;
+
+                case 9:
+                    deactivateEmployee(employees, count);
+                    break;
+
+                case 10:
+                    sortEmployees(employees, count);
+                    break;
+
+                case 11:
+                    performanceRanking(employees, count);
+                    break;
+
+                default:
+                    cout << "\nInvalid choice. "
+                         << "Enter a number from 1 to 11.\n";
+            }
+        }
+        catch (const exception& e)
+        {
+            cout << "\nError: " << e.what() << '\n';
+        }
+    }
+}
